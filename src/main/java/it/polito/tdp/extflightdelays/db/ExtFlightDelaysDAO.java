@@ -7,7 +7,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
+import it.polito.tdp.extflightdelays.model.Adiacenza;
 import it.polito.tdp.extflightdelays.model.Airline;
 import it.polito.tdp.extflightdelays.model.Airport;
 import it.polito.tdp.extflightdelays.model.Flight;
@@ -37,9 +39,8 @@ public class ExtFlightDelaysDAO {
 		}
 	}
 
-	public List<Airport> loadAllAirports() {
+	public void loadAllAirports(Map<Integer,Airport> idMap) {
 		String sql = "SELECT * FROM airports";
-		List<Airport> result = new ArrayList<Airport>();
 
 		try {
 			Connection conn = ConnectDB.getConnection();
@@ -47,14 +48,15 @@ public class ExtFlightDelaysDAO {
 			ResultSet rs = st.executeQuery();
 
 			while (rs.next()) {
-				Airport airport = new Airport(rs.getInt("ID"), rs.getString("IATA_CODE"), rs.getString("AIRPORT"),
+				if(!idMap.containsKey(rs.getInt("ID"))) {
+					Airport airport = new Airport(rs.getInt("ID"), rs.getString("IATA_CODE"), rs.getString("AIRPORT"),
 						rs.getString("CITY"), rs.getString("STATE"), rs.getString("COUNTRY"), rs.getDouble("LATITUDE"),
 						rs.getDouble("LONGITUDE"), rs.getDouble("TIMEZONE_OFFSET"));
-				result.add(airport);
+					idMap.put(rs.getInt("ID"), airport);
+				}
 			}
 
 			conn.close();
-			return result;
 
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -62,7 +64,7 @@ public class ExtFlightDelaysDAO {
 			throw new RuntimeException("Error Connection Database");
 		}
 	}
-
+	
 	public List<Flight> loadAllFlights() {
 		String sql = "SELECT * FROM flights";
 		List<Flight> result = new LinkedList<Flight>();
@@ -80,6 +82,32 @@ public class ExtFlightDelaysDAO {
 						rs.getDouble("ELAPSED_TIME"), rs.getInt("DISTANCE"),
 						rs.getTimestamp("ARRIVAL_DATE").toLocalDateTime(), rs.getDouble("ARRIVAL_DELAY"));
 				result.add(flight);
+			}
+
+			conn.close();
+			return result;
+
+		} catch (SQLException e) {
+			e.printStackTrace();
+			System.out.println("Errore connessione al database");
+			throw new RuntimeException("Error Connection Database");
+		}
+	}
+	
+	public List<Adiacenza> getAdiacenza(double distanzaminima){
+		String sql="SELECT s1.ORIGIN_AIRPORT_ID as id1, s1.DESTINATION_AIRPORT_ID as id2, AVG(`DISTANCE`) as peso from flights s1 GROUP BY s1.ORIGIN_AIRPORT_ID, s1.DESTINATION_AIRPORT_ID";
+		List<Adiacenza> result=new LinkedList<Adiacenza>();
+		
+		try {
+			Connection conn = ConnectDB.getConnection();
+			PreparedStatement st = conn.prepareStatement(sql);
+			ResultSet rs = st.executeQuery();
+
+			while (rs.next()) {
+				if(rs.getDouble("peso")>=distanzaminima) {
+					Adiacenza a=new Adiacenza(rs.getInt("id1"),rs.getInt("id2"),rs.getDouble("peso"));
+					result.add(a);
+				}
 			}
 
 			conn.close();
